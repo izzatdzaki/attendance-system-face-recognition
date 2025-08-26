@@ -1,0 +1,117 @@
+body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    padding: 20px;
+
+    background-image : url(adz.jpg) ;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+h1{
+    text-align: center;
+    color: #333;
+    background-color: #ddd;
+    margin-bottom: 20px;
+}
+
+.tes {
+    text-align: right;
+    margin: 20px ;
+}
+
+.container {
+    max-width: 500px;
+    margin: 0 auto;
+}
+.logo-container {
+    text-align: center; /* Mengatur logo agar berada di tengah */
+    margin: 20px 0; /* Menambahkan margin atas dan bawah */
+}
+.logo {
+    max-width: 10%; /* Memastikan logo responsif */
+    height: auto; /* Mempertahankan rasio aspek */
+}
+.video-container {
+    position: relative;
+    width: 70%;
+    max-width: 360px;
+    margin: 20px auto;
+}
+
+#video {
+    width: 100%;
+    height: auto;
+    border-radius: 8px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+.controls {
+    display: flex;
+    justify-content: center;
+    gap: 15px;
+    margin: 20px 0;
+}
+
+button {
+    padding: 10px 20px;
+    background: #3498db;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-size: 16px;
+    transition: background 0.3s;
+}
+
+button:hover {
+    background: #2980b9;
+}
+
+.status {
+    padding: 10px;
+    border-radius: 5px;
+    text-align: center;
+    margin: 15px 0;
+    font-weight: bold;
+}
+
+.loading { background: #f39c12; color: white; }
+.success { background: #2ecc71; color: white; }
+.error { background: #e74c3c; color: white; }
+
+table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 20px;
+}
+
+th, td {
+    padding: 12px;
+    text-align: left;
+    border-bottom: 1px solid #ddd;
+}
+
+.notification-popup {
+    display: none;
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    background: #2ecc71;
+    color: white;
+    padding: 20px 40px;
+    border-radius: 5px;
+    box-shadow: 0 4px 8px rgba(0,0,0,0.2);
+    z-index: 1000;
+    animation: fadeIn 0.3s ease-out;
+}
+
+@keyframes fadeIn {
+    from { opacity: 0; transform: translate(-50%, -60%); }
+    to { opacity: 1; transform: translate(-50%, -50%); }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
