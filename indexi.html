@@ -1,0 +1,35 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Pendaftaran User</title>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="style.css"> <!-- External CSS file -->
+</head>
+<body>
+    <div class="logo-container">
+    <img src="logo.png" alt="Logo Perusahaan" class="logo">
+    </div>
+    <div class="container">
+        <h1 class="">Pendaftaran User</h1>
+        
+        <div class="status loading">Memulai sistem...</div>
+        
+        <div class="video-container">
+            <video id="video" autoplay muted></video>
+        </div>
+
+        <div class="controls">
+            <button id="registerBtn" disabled>Daftarkan User</button>
+            <button id="attendanceBtn" style="display: none;" disabled>Ambil Absensi</button>
+        </div>
+        <div id="notificationPopup" class="notification-popup">
+            <span id="popupMessage">Berhasil Mendaftarkan User</span>
+        </div>
+    </div>
+
+    <script src="scripter.js"></script> <!-- External JavaScript file -->
+</body>
+</html>

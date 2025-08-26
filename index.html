@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Absensi Face Recognition</title>
+    <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+    <link rel="stylesheet" href="style.css"> <!-- External CSS file -->
+</head>
+<body>
+    <div class="logo-container">
+    <img src="logo.png" alt="Logo Perusahaan" class="logo">
+</div>
+    <div class="container">
+        <h1 class="">Sistem Absensi Face Recognition</h1>
+        
+        <div class="status loading">Memulai sistem...</div>
+        
+        <div class="video-container">
+            <video id="video" autoplay muted></video>
+        </div>
+
+        <div class="controls">
+            <button id="registerBtn" style="display: none;"  disabled>Daftarkan User</button>
+            <button id="attendanceBtn" disabled>Ambil Absensi</button>
+        </div>
+    </div>
+    <div class="container">
+        <h3 style="background-color: #ddd; text-align: center;">Riwayat Absensi User</h3>
+            <table id="attendanceTable" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
+                <thead style=" background-color: #007bff; color: white; padding: 10px; text-align: left;">
+                    <tr>
+                        <th >Nama</th>
+                        <th >NIDN</th>
+                        <th >Jabatan</th>
+                        <th >Waktu Absensi</th>
+                    </tr>
+                </thead>
+                <tbody></tbody>
+            </table>
+    </div>
+        <div id="notificationPopup" class="notification-popup">
+            <span id="popupMessage">Berhasil Melakukan Absensi</span>
+        </div>
+    </div>
+
+    <script src="script.js"></script> <!-- External JavaScript file -->
+</body>
+</html>
