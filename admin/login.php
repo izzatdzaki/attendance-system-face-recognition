@@ -113,7 +113,7 @@ if ($_SERVER['REQUEST_METHOD'] == 'POST') {
             </form>
         </div>
         <div class="mt-6 text-center text-white text-sm">
-            <p>&copy; 2025 Sistem Admin Absensi Face Recognition. Hak cipta dilindungi. <br>Deri Desriandi</p>
+            <p>&copy; <?php echo date('Y'); ?> Sistem Admin Absensi Face Recognition. Hak cipta dilindungi. <br>Izzat Dzaki</p>
 
         </div>
     </div>
