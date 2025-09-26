@@ -3,7 +3,7 @@ body {
     margin: 0;
     padding: 20px;
 
-    background-image : url(adz.jpg) ;
+    background-image : url(bg-home.jpg) ;
     background-repeat: no-repeat;
     background-size: cover;
 }
@@ -114,4 +114,74 @@ th, td {
 @keyframes fadeOut {
     from { opacity: 1; }
     to { opacity: 0; }
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    body {
+        padding: 10px;
+    }
+    
+    .container {
+        max-width: 100%;
+        padding: 15px;
+    }
+    
+    .video-container {
+        width: 95%;
+        max-width: 100%;
+        margin: 15px auto;
+    }
+    
+    #video {
+        border-radius: 12px;
+        max-height: 70vh;
+        object-fit: cover;
+    }
+    
+    .controls {
+        flex-direction: column;
+        gap: 10px;
+        padding: 0 10px;
+    }
+    
+    button {
+        width: 100%;
+        padding: 15px 20px;
+        font-size: 18px;
+        border-radius: 8px;
+        margin: 5px 0;
+    }
+    
+    .status {
+        margin: 10px 0;
+        padding: 15px;
+        font-size: 16px;
+        border-radius: 8px;
+    }
+    
+    table {
+        font-size: 14px;
+        overflow-x: auto;
+        display: block;
+        white-space: nowrap;
+    }
+    
+    th, td {
+        padding: 8px;
+        min-width: 100px;
+    }
+    
+    .notification-popup {
+        width: 90%;
+        max-width: 300px;
+        padding: 15px 20px;
+        font-size: 16px;
+    }
+    
+    h1 {
+        font-size: 24px;
+        padding: 15px;
+        margin-bottom: 15px;
+    }
 }

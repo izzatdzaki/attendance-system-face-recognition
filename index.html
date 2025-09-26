@@ -2,7 +2,13 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <!-- Camera permissions for mobile -->
+    <meta http-equiv="Permissions-Policy" content="camera=*">
+    <meta name="theme-color" content="#007bff">
     <title>Absensi Face Recognition</title>
     <script src="https://cdn.jsdelivr.net/npm/face-api.js@0.22.2/dist/face-api.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
@@ -13,17 +19,28 @@
     <img src="logo.png" alt="Logo Perusahaan" class="logo">
 </div>
     <div class="container">
-        <h1 class="">Sistem Absensi Face Recognition</h1>
+        <h1 class="">Sistem Absensi Face Recognition RSIA MASYITA</h1>
         
         <div class="status loading">Memulai sistem...</div>
         
         <div class="video-container">
-            <video id="video" autoplay muted></video>
-        </div>
+                <video id="video" autoplay muted playsinline webkit-playsinline></video>
+                <!-- <div class="face-guide">
+                    <p>📹 <strong>Panduan Deteksi Wajah:</strong></p>
+                    <ul>
+                        <li>✅ Posisikan wajah di tengah kamera</li>
+                        <li>💡 Pastikan pencahayaan cukup terang</li>
+                        <li>👤 Jarak ideal: 50-100 cm dari kamera</li>
+                        <li>📐 Hadapkan wajah langsung ke kamera</li>
+                    </ul>
+                </div> -->
+            </div>
 
         <div class="controls">
             <button id="registerBtn" style="display: none;"  disabled>Daftarkan User</button>
-            <button id="attendanceBtn" disabled>Ambil Absensi</button>
+            <button id="clockInBtn" disabled>🕐 Jam Datang</button>
+            <button id="clockOutBtn" disabled>🕕 Jam Pulang</button>
+            <button id="debugBtn" style="background: #e74c3c; margin-top: 10px;">🔧 Test Koneksi</button>
         </div>
     </div>
     <div class="container">
@@ -31,10 +48,16 @@
             <table id="attendanceTable" style="width: 100%; border-collapse: collapse; margin-top: 20px;">
                 <thead style=" background-color: #007bff; color: white; padding: 10px; text-align: left;">
                     <tr>
-                        <th >Nama</th>
-                        <th >NIDN</th>
-                        <th >Jabatan</th>
-                        <th >Waktu Absensi</th>
+                        <th>Nama</th>
+                        <th>NIP</th>
+                        <th>Jabatan</th>
+                        <th>Tanggal</th>
+                        <th>Jam Datang</th>
+                        <th>Jam Pulang</th>
+                        <th>Status</th>
+                        <th>Lembur Mulai</th>
+                        <th>Lembur Selesai</th>
+                        <th>Status Lembur</th>
                     </tr>
                 </thead>
                 <tbody></tbody>

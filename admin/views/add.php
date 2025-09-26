@@ -2,6 +2,7 @@
     .container {
     max-width: 500px;
     margin: 0 auto;
+    padding: 10px;
 }
 .logo-container {
     text-align: center; /* Mengatur logo agar berada di tengah */
@@ -13,7 +14,7 @@
 }
 .video-container {
     position: relative;
-    width: 70%;
+    width: 90%;
     max-width: 360px;
     margin: 20px auto;
 }
@@ -23,6 +24,64 @@
     height: auto;
     border-radius: 8px;
     box-shadow: 0 4px 12px rgba(0,0,0,0.1);
+}
+
+/* Mobile Responsive Styles */
+@media (max-width: 768px) {
+    .container {
+        padding: 15px;
+        max-width: 100%;
+    }
+    
+    .video-container {
+        width: 95%;
+        max-width: 100%;
+        margin: 15px auto;
+    }
+    
+    #video {
+        border-radius: 12px;
+        max-height: 70vh;
+        object-fit: cover;
+    }
+    
+    .controls {
+        flex-direction: column;
+        gap: 10px;
+        padding: 0 10px;
+    }
+    
+    button {
+        width: 100%;
+        padding: 15px 20px;
+        font-size: 18px;
+        border-radius: 8px;
+    }
+    
+    .status {
+        margin: 10px 0;
+        padding: 15px;
+        font-size: 16px;
+    }
+    
+    #registrationDialog {
+        width: 90%;
+        max-width: 400px;
+        padding: 20px;
+        margin: 20px;
+    }
+    
+    .dialog-content input {
+        padding: 15px;
+        font-size: 16px;
+        border-radius: 8px;
+    }
+    
+    .dialog-content button {
+        padding: 15px;
+        font-size: 16px;
+        border-radius: 8px;
+    }
 }
 
 .controls {
@@ -142,12 +201,13 @@ th, td {
     <div class="status loading">Memulai sistem...</div>
     
     <div class="video-container">
-        <video id="video" autoplay muted></video>
+        <video id="video" autoplay muted playsinline webkit-playsinline></video>
     </div>
 
     <div class="controls">
         <button id="registerBtn" disabled>Daftarkan User</button>
         <button id="attendanceBtn" style="display: none;" disabled>Ambil Absensi</button>
+        <button id="debugBtn" style="background: #e74c3c; margin-top: 10px;">Test Koneksi</button>
     </div>
     
     <div id="notificationPopup" class="notification-popup">
@@ -159,8 +219,8 @@ th, td {
         <h3>Daftarkan User</h3>
         <label for="userName">Nama:</label>
         <input type="text" id="userName" placeholder="Masukkan nama" required>
-        <label for="userNIDN">NIDN:</label>
-        <input type="text" id="userNIDN" placeholder="Masukkan NIDN" required>
+        <label for="userNIP">NIP:</label>
+        <input type="text" id="userNIP" placeholder="Masukkan NIP" required>
         <label for="userJabatan">Jabatan:</label>
         <input type="text" id="userJabatan" placeholder="Masukkan jabatan" required>
         <div style="display: flex; gap: 10px; margin-top: 15px;">
@@ -171,8 +231,22 @@ th, td {
 </div>
 </div>
 <script>
-    // Konfigurasi Database
-    const API_BASE_URL = 'http://localhost/face/api.php'; // Sesuaikan dengan endpoint PHP Anda
+    // Konfigurasi Database - Dynamic URL untuk mobile compatibility
+    const getApiUrl = () => {
+        const host = window.location.hostname;
+        const port = window.location.port;
+        const protocol = window.location.protocol;
+        
+        // Jika menggunakan port 8000 (development server)
+        if (port === '8000') {
+            return `${protocol}//${host}:${port}/api.php`;
+        }
+        
+        // Jika menggunakan server normal (port 80/443)
+        return `${protocol}//${host}/absensi/api.php`;
+    };
+    
+    const API_BASE_URL = getApiUrl();
 
     // Elements
     const video = document.getElementById('video');
@@ -181,9 +255,11 @@ th, td {
     const statusDiv = document.querySelector('.status');
     const attendanceTable = document.querySelector('#attendanceTable tbody');
 
-    // Fungsi untuk memanggil API
+    // Fungsi untuk memanggil API dengan error handling yang lebih baik
     async function callAPI(action, data = {}) {
         try {
+            console.log('Calling API:', API_BASE_URL, 'Action:', action);
+            
             const response = await fetch(API_BASE_URL, {
                 method: 'POST',
                 headers: {
@@ -192,10 +268,31 @@ th, td {
                 body: JSON.stringify({ action, ...data })
             });
             
-            return await response.json();
+            if (!response.ok) {
+                throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+            }
+            
+            const result = await response.json();
+            console.log('API Response:', result);
+            return result;
+            
         } catch (error) {
             console.error('API Error:', error);
-            return { success: false, message: 'Koneksi ke server gagal' };
+            
+            // Error handling yang lebih spesifik
+            let errorMessage = 'Koneksi ke server gagal';
+            
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = 'Tidak dapat terhubung ke server. Pastikan koneksi internet aktif.';
+            } else if (error.message.includes('HTTP 404')) {
+                errorMessage = 'API endpoint tidak ditemukan. Periksa konfigurasi server.';
+            } else if (error.message.includes('HTTP 500')) {
+                errorMessage = 'Server mengalami error internal. Coba lagi nanti.';
+            } else if (error.message.includes('NetworkError')) {
+                errorMessage = 'Error jaringan. Periksa koneksi internet Anda.';
+            }
+            
+            return { success: false, message: errorMessage, debug: error.message };
         }
     }
 
@@ -223,17 +320,84 @@ th, td {
         }
     }
 
+    // Fungsi untuk mendeteksi perangkat mobile
+    function isMobileDevice() {
+        return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+               (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+    }
+
+    // Fungsi untuk mendeteksi iOS
+    function isIOSDevice() {
+        return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+               (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+    }
+
     // Mulai kamera
     async function startVideo() {
         try {
-            const stream = await navigator.mediaDevices.getUserMedia({ 
-                video: { width: 720, height: 560 }, 
-                audio: false 
-            });
+            // Cek dukungan browser
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error("Browser tidak mendukung akses kamera");
+            }
+
+            const isMobile = isMobileDevice();
+            const isIOS = isIOSDevice();
+            
+            // Konfigurasi kamera berdasarkan perangkat
+            let constraints = {
+                audio: false,
+                video: {
+                    facingMode: isMobile ? 'user' : 'user', // Front camera untuk mobile
+                    width: isMobile ? { ideal: 640, max: 1280 } : { ideal: 720 },
+                    height: isMobile ? { ideal: 480, max: 720 } : { ideal: 560 }
+                }
+            };
+
+            // Pengaturan khusus iOS
+            if (isIOS) {
+                constraints.video.frameRate = { ideal: 30, max: 30 };
+            }
+
+            const stream = await navigator.mediaDevices.getUserMedia(constraints);
             video.srcObject = stream;
+            
+            // Pengaturan video untuk mobile
+            if (isMobile) {
+                video.setAttribute('playsinline', 'true');
+                video.setAttribute('webkit-playsinline', 'true');
+                video.muted = true;
+            }
+            
         } catch (error) {
             statusDiv.className = "status error";
-            statusDiv.textContent = "Izin kamera ditolak!";
+            let errorMessage = "Gagal mengakses kamera: ";
+            
+            switch(error.name) {
+                case 'NotAllowedError':
+                    errorMessage += "Izin kamera ditolak. Silakan izinkan akses kamera.";
+                    break;
+                case 'NotFoundError':
+                    errorMessage += "Kamera tidak ditemukan.";
+                    break;
+                case 'NotSupportedError':
+                    errorMessage += "Browser tidak mendukung akses kamera.";
+                    break;
+                default:
+                    errorMessage += error.message;
+            }
+            
+            statusDiv.textContent = errorMessage;
+            
+            // Tambahkan tombol retry untuk mobile
+            if (isMobileDevice()) {
+                const retryBtn = document.createElement('button');
+                retryBtn.textContent = 'Coba Lagi';
+                retryBtn.onclick = () => {
+                    retryBtn.remove();
+                    startVideo();
+                };
+                statusDiv.appendChild(retryBtn);
+            }
         }
     }
 // Variabel global untuk menyimpan face descriptor
@@ -274,11 +438,11 @@ registerBtn.addEventListener('click', async () => {
 // Handle form submission
 document.getElementById('submitRegistration').addEventListener('click', async () => {
     const name = document.getElementById('userName').value;
-    const NIDN = document.getElementById('userNIDN').value;
+    const NIP = document.getElementById('userNIP').value;
     const jabatan = document.getElementById('userJabatan').value;
 
-    if (!name || !jabatan || !NIDN) {
-        alert("Nama, NIDN dan jabatan harus diisi!");
+    if (!name || !jabatan || !NIP) {
+        alert("Nama, NIP dan jabatan harus diisi!");
         return;
     }
 
@@ -296,7 +460,7 @@ document.getElementById('submitRegistration').addEventListener('click', async ()
         
         const response = await callAPI('register', {
             name: name,
-            NIDN : NIDN,
+            NIP : NIP,
             jabatan: jabatan,
             face_descriptor: JSON.stringify(descriptorArray)
         });
@@ -308,7 +472,7 @@ document.getElementById('submitRegistration').addEventListener('click', async ()
             
             // Reset dialog
             document.getElementById('userName').value = '';
-            document.getElementById('userNIDN').value = '';
+            document.getElementById('userNIP').value = '';
             document.getElementById('userJabatan').value = '';
             document.getElementById('registrationDialog').style.display = 'none';
             currentFaceDescriptor = null;
@@ -345,6 +509,51 @@ function showPopup(message, isSuccess = true) {
         popup.style.display = 'none';
     }, 3000);
 }
+
+// Debug function untuk test koneksi
+async function testConnection() {
+    const debugBtn = document.getElementById('debugBtn');
+    debugBtn.textContent = 'Testing...';
+    debugBtn.disabled = true;
+    
+    try {
+        statusDiv.textContent = `Testing koneksi ke: ${API_BASE_URL}`;
+        statusDiv.className = "status loading";
+        
+        const result = await callAPI('test_connection');
+        
+        if (result.success) {
+            statusDiv.textContent = "✅ Koneksi berhasil!";
+            statusDiv.className = "status success";
+            showPopup("Koneksi ke server berhasil!", true);
+        } else {
+            statusDiv.textContent = `❌ Koneksi gagal: ${result.message}`;
+            statusDiv.className = "status error";
+            showPopup(`Koneksi gagal: ${result.message}`, false);
+        }
+        
+        // Show debug info
+        console.log('Debug Info:', {
+            url: API_BASE_URL,
+            host: window.location.hostname,
+            port: window.location.port,
+            protocol: window.location.protocol,
+            userAgent: navigator.userAgent,
+            result: result
+        });
+        
+    } catch (error) {
+        statusDiv.textContent = `❌ Error: ${error.message}`;
+        statusDiv.className = "status error";
+        showPopup(`Error: ${error.message}`, false);
+    }
+    
+    debugBtn.textContent = 'Test Koneksi';
+    debugBtn.disabled = false;
+}
+
+// Event listener untuk debug button
+document.getElementById('debugBtn').addEventListener('click', testConnection);
 
   // Jalankan aplikasi
     loadModels();

@@ -1,7 +1,11 @@
 <?php
+// Session sudah dimulai di admin.php, tidak perlu session_start() lagi
+require_once '../db_connect.php';
+
 $conn = connectDB();
 
 // Handle delete action
+$delete_success = false;
 if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id'])) {
     try {
         $stmt = $conn->prepare("DELETE FROM tbl_attendance WHERE user_id = ?");
@@ -9,10 +13,9 @@ if (isset($_GET['action']) && $_GET['action'] == 'delete' && isset($_GET['id']))
 
         $stmt = $conn->prepare("DELETE FROM tbl_user WHERE id = ?");
         $stmt->execute([$_GET['id']]);
-        header("Location: $current_page");
-        exit;
+        $delete_success = true;
     } catch (PDOException $e) {
-        die("Error deleting user: " . $e->getMessage());
+        $delete_error = "Error deleting user: " . $e->getMessage();
     }
 }
 
@@ -122,7 +125,20 @@ try {
     </div>
 
     <!-- Success Notification -->
-    <?php if (isset($_GET['success'])): ?>
+    <?php if ($delete_success): ?>
+    <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+        Berhasil: User telah dihapus!
+    </div>
+    <script>
+        setTimeout(function() {
+            window.location.href = '?page=users';
+        }, 1500);
+    </script>
+    <?php elseif (isset($delete_error)): ?>
+    <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+        Error: <?= htmlspecialchars($delete_error) ?>
+    </div>
+    <?php elseif (isset($_GET['success'])): ?>
     <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
         Berhasil: 
         <?= $_GET['success'] == 'delete' ? 'User berhasil dihapus' : 

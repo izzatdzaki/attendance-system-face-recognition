@@ -1,5 +1,19 @@
-// Konfigurasi Database
-const API_BASE_URL = 'http://localhost/face/api.php'; // Sesuaikan dengan endpoint PHP Anda
+// Konfigurasi Database - Dynamic URL untuk mobile compatibility
+const getApiUrl = () => {
+    const host = window.location.hostname;
+    const port = window.location.port;
+    const protocol = window.location.protocol;
+    
+    // Jika menggunakan port 8000 (development server)
+    if (port === '8000') {
+        return `${protocol}//${host}:${port}/api.php`;
+    }
+    
+    // Jika menggunakan server normal (port 80/443)
+    return `${protocol}//${host}/absensi/api.php`;
+};
+
+const API_BASE_URL = getApiUrl();
 
 // Elements
 const video = document.getElementById('video');
@@ -8,9 +22,11 @@ const attendanceBtn = document.getElementById('attendanceBtn');
 const statusDiv = document.querySelector('.status');
 const attendanceTable = document.querySelector('#attendanceTable tbody');
 
-// Fungsi untuk memanggil API
+// Fungsi untuk memanggil API dengan error handling yang lebih baik
 async function callAPI(action, data = {}) {
     try {
+        console.log('Calling API:', API_BASE_URL, 'Action:', action);
+        
         const response = await fetch(API_BASE_URL, {
             method: 'POST',
             headers: {
@@ -19,10 +35,31 @@ async function callAPI(action, data = {}) {
             body: JSON.stringify({ action, ...data })
         });
         
-        return await response.json();
+        if (!response.ok) {
+            throw new Error(`HTTP ${response.status}: ${response.statusText}`);
+        }
+        
+        const result = await response.json();
+        console.log('API Response:', result);
+        return result;
+        
     } catch (error) {
         console.error('API Error:', error);
-        return { success: false, message: 'Koneksi ke server gagal' };
+        
+        // Error handling yang lebih spesifik
+        let errorMessage = 'Koneksi ke server gagal';
+        
+        if (error.name === 'TypeError' && error.message.includes('fetch')) {
+            errorMessage = 'Tidak dapat terhubung ke server. Pastikan koneksi internet aktif.';
+        } else if (error.message.includes('HTTP 404')) {
+            errorMessage = 'API endpoint tidak ditemukan. Periksa konfigurasi server.';
+        } else if (error.message.includes('HTTP 500')) {
+            errorMessage = 'Server mengalami error internal. Coba lagi nanti.';
+        } else if (error.message.includes('NetworkError')) {
+            errorMessage = 'Error jaringan. Periksa koneksi internet Anda.';
+        }
+        
+        return { success: false, message: errorMessage, debug: error.message };
     }
 }
 
@@ -51,17 +88,84 @@ async function loadModels() {
     }
 }
 
+// Fungsi untuk mendeteksi perangkat mobile
+function isMobileDevice() {
+    return /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(navigator.userAgent) || 
+           (navigator.maxTouchPoints && navigator.maxTouchPoints > 2 && /MacIntel/.test(navigator.platform));
+}
+
+// Fungsi untuk mendeteksi iOS
+function isIOSDevice() {
+    return /iPad|iPhone|iPod/.test(navigator.userAgent) || 
+           (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+}
+
 // Mulai kamera
 async function startVideo() {
     try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { width: 720, height: 560 }, 
-            audio: false 
-        });
+        // Cek dukungan browser
+        if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+            throw new Error("Browser tidak mendukung akses kamera");
+        }
+
+        const isMobile = isMobileDevice();
+        const isIOS = isIOSDevice();
+        
+        // Konfigurasi kamera berdasarkan perangkat
+        let constraints = {
+            audio: false,
+            video: {
+                facingMode: isMobile ? 'user' : 'user', // Front camera untuk mobile
+                width: isMobile ? { ideal: 640, max: 1280 } : { ideal: 720 },
+                height: isMobile ? { ideal: 480, max: 720 } : { ideal: 560 }
+            }
+        };
+
+        // Pengaturan khusus iOS
+        if (isIOS) {
+            constraints.video.frameRate = { ideal: 30, max: 30 };
+        }
+
+        const stream = await navigator.mediaDevices.getUserMedia(constraints);
         video.srcObject = stream;
+        
+        // Pengaturan video untuk mobile
+        if (isMobile) {
+            video.setAttribute('playsinline', 'true');
+            video.setAttribute('webkit-playsinline', 'true');
+            video.muted = true;
+        }
+        
     } catch (error) {
         statusDiv.className = "status error";
-        statusDiv.textContent = "Izin kamera ditolak!";
+        let errorMessage = "Gagal mengakses kamera: ";
+        
+        switch(error.name) {
+            case 'NotAllowedError':
+                errorMessage += "Izin kamera ditolak. Silakan izinkan akses kamera.";
+                break;
+            case 'NotFoundError':
+                errorMessage += "Kamera tidak ditemukan.";
+                break;
+            case 'NotSupportedError':
+                errorMessage += "Browser tidak mendukung akses kamera.";
+                break;
+            default:
+                errorMessage += error.message;
+        }
+        
+        statusDiv.textContent = errorMessage;
+        
+        // Tambahkan tombol retry untuk mobile
+        if (isMobileDevice()) {
+            const retryBtn = document.createElement('button');
+            retryBtn.textContent = 'Coba Lagi';
+            retryBtn.onclick = () => {
+                retryBtn.remove();
+                startVideo();
+            };
+            statusDiv.appendChild(retryBtn);
+        }
     }
 }
 
