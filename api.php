@@ -3,7 +3,7 @@ header('Content-Type: application/json');
 require_once 'db_connect.php'; // File koneksi database
 
 // Set timezone Indonesia
-date_default_timezone_set('Asia/Jakarta');
+date_default_timezone_set('Asia/Makassar');
 
 $input = json_decode(file_get_contents('php://input'), true);
 $action = $input['action'] ?? '';
@@ -24,10 +24,11 @@ try {
             // Set default values jika tidak ada
             $jabatan = $input['jabatan'] ?? 'Staff';
             $nip = $input['NIP'] ?? '';
+            $shiftId = !empty($input['shift_id']) ? $input['shift_id'] : null;
             
-            // Simpan ke tbl_user
-            $stmt = $pdo->prepare("INSERT INTO tbl_user (name, jabatan, NIP, face_descriptor, created_at) VALUES (?, ?, ?, ?, NOW())");
-            $result = $stmt->execute([$input['name'], $jabatan, $nip, $input['face_descriptor']]);
+            // Simpan ke tbl_user dengan shift_id
+            $stmt = $pdo->prepare("INSERT INTO tbl_user (name, jabatan, NIP, shift_id, face_descriptor, created_at) VALUES (?, ?, ?, ?, ?, NOW())");
+            $result = $stmt->execute([$input['name'], $jabatan, $nip, $shiftId, $input['face_descriptor']]);
             
             if ($result) {
                 echo json_encode([
@@ -82,6 +83,16 @@ try {
             if ($bestMatch) {
                 $today = date('Y-m-d');
                 $currentTime = date('H:i:s');
+                
+                // Validasi shift dan jam kerja
+                $shiftValidation = validateUserShiftTime($pdo, $bestMatch['id'], $currentTime);
+                if (!$shiftValidation['valid']) {
+                    echo json_encode([
+                        'success' => false,
+                        'message' => $shiftValidation['message']
+                    ]);
+                    return;
+                }
                 
                 // Cek status absensi hari ini
                 $checkStmt = $pdo->prepare("SELECT id, status_absen, status_lembur FROM tbl_attendance WHERE user_id = ? AND tanggal_absen = ?");
@@ -194,6 +205,16 @@ try {
             if ($bestMatch) {
                 $today = date('Y-m-d');
                 $currentTime = date('H:i:s');
+                
+                // Validasi shift dan jam kerja
+                $shiftValidation = validateUserShiftTime($pdo, $bestMatch['id'], $currentTime);
+                if (!$shiftValidation['valid']) {
+                    echo json_encode([
+                        'success' => false,
+                        'message' => $shiftValidation['message']
+                    ]);
+                    return;
+                }
                 
                 // Cek status absensi dan lembur hari ini
                 $checkStmt = $pdo->prepare("SELECT id, status_absen, status_lembur FROM tbl_attendance WHERE user_id = ? AND tanggal_absen = ?");
@@ -380,4 +401,100 @@ function findNearestLocation($pdo, $userLat, $userLon) {
     }
     
     return $nearest;
+}
+
+// Fungsi untuk validasi shift dan jam kerja user
+function validateUserShiftTime($pdo, $userId, $currentTime) {
+    // Get user dengan shift info
+    $stmt = $pdo->prepare("SELECT u.*, s.* FROM tbl_user u 
+                          LEFT JOIN tbl_shifts s ON u.shift_id = s.id 
+                          WHERE u.id = ? AND s.is_active = 1");
+    $stmt->execute([$userId]);
+    $user = $stmt->fetch();
+    
+    if (!$user) {
+        return [
+            'valid' => false,
+            'message' => 'User tidak ditemukan atau belum memiliki shift yang ditentukan'
+        ];
+    }
+    
+    if (!$user['shift_id']) {
+        return [
+            'valid' => false,
+            'message' => 'Anda belum memiliki shift yang ditentukan. Silakan hubungi administrator.'
+        ];
+    }
+    
+    // Convert times to minutes for easier calculation
+    $currentMinutes = timeToMinutes($currentTime);
+    $startMinutes = timeToMinutes($user['start_time']);
+    $endMinutes = timeToMinutes($user['end_time']);
+    $tolerance = $user['tolerance_minutes'] ?? 15;
+    
+    if ($user['is_overnight']) {
+        // Handle overnight shift (misal: 21:00 - 08:00)
+        if ($currentMinutes >= $startMinutes || $currentMinutes <= $endMinutes) {
+            $lateMinutes = 0;
+            if ($currentMinutes > $startMinutes) {
+                $lateMinutes = $currentMinutes - $startMinutes;
+            }
+            
+            $status = $lateMinutes <= $tolerance ? 'on_time' : 'late';
+            $message = $status === 'on_time' ? 
+                'Tepat waktu untuk shift ' . $user['department'] . ' - ' . $user['shift_name'] :
+                "Terlambat $lateMinutes menit untuk shift " . $user['department'] . ' - ' . $user['shift_name'];
+            
+            return [
+                'valid' => true,
+                'status' => $status,
+                'late_minutes' => $lateMinutes,
+                'message' => $message,
+                'shift_info' => [
+                    'name' => $user['shift_name'],
+                    'department' => $user['department'],
+                    'start_time' => $user['start_time'],
+                    'end_time' => $user['end_time']
+                ]
+            ];
+        }
+    } else {
+        // Handle regular shift
+        $shiftStart = $startMinutes - $tolerance; // Boleh masuk sebelum jam kerja dengan toleransi
+        $shiftEnd = $endMinutes + 60; // Boleh sampai 1 jam setelah jam kerja berakhir
+        
+        if ($currentMinutes >= $shiftStart && $currentMinutes <= $shiftEnd) {
+            $lateMinutes = max(0, $currentMinutes - $startMinutes);
+            $status = $lateMinutes <= $tolerance ? 'on_time' : 'late';
+            $message = $status === 'on_time' ? 
+                'Tepat waktu untuk shift ' . $user['department'] . ' - ' . $user['shift_name'] :
+                "Terlambat $lateMinutes menit untuk shift " . $user['department'] . ' - ' . $user['shift_name'];
+            
+            return [
+                'valid' => true,
+                'status' => $status,
+                'late_minutes' => $lateMinutes,
+                'message' => $message,
+                'shift_info' => [
+                    'name' => $user['shift_name'],
+                    'department' => $user['department'],
+                    'start_time' => $user['start_time'],
+                    'end_time' => $user['end_time']
+                ]
+            ];
+        }
+    }
+    
+    return [
+        'valid' => false,
+        'message' => 'Diluar jam kerja yang ditentukan. Shift Anda: ' . 
+                    $user['department'] . ' - ' . $user['shift_name'] . 
+                    ' (' . $user['start_time'] . ' - ' . $user['end_time'] . ')'
+    ];
+}
+
+// Helper function untuk konversi waktu ke menit
+function timeToMinutes($time) {
+    list($hours, $minutes) = explode(':', $time);
+    return ($hours * 60) + $minutes;
 }

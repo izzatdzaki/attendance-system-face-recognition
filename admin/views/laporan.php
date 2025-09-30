@@ -7,13 +7,17 @@
         $end_date = $_GET['end_date'] ?? date('Y-m-t');
         $search_name = $_GET['search_name'] ?? '';
         $status_lembur_filter = $_GET['status_lembur'] ?? '';
+        $department_filter = $_GET['department'] ?? '';
         
-        // Query data absensi dengan filter termasuk data lembur dan lokasi
+        // Query data absensi dengan filter termasuk data lembur, lokasi, dan shift
         $query = "SELECT a.id, u.name, u.jabatan, u.NIP, a.tanggal_absen, a.jam_datang, a.jam_pulang, a.status_absen,
                          a.jam_lembur_mulai, a.jam_lembur_selesai, a.status_lembur,
-                         a.location_name, a.location_verified, a.user_latitude, a.user_longitude
+                         a.location_name, a.location_verified, a.user_latitude, a.user_longitude,
+                         s.shift_name, s.department, s.start_time, s.end_time, s.tolerance_minutes,
+                         u.shift_id
                   FROM tbl_attendance a
                   JOIN tbl_user u ON a.user_id = u.id
+                  LEFT JOIN tbl_shifts s ON u.shift_id = s.id
                   WHERE a.tanggal_absen BETWEEN :start_date AND :end_date";
         
         $params = [
@@ -31,11 +35,44 @@
             $params[':status_lembur'] = $status_lembur_filter;
         }
         
+        if (!empty($department_filter)) {
+            $query .= " AND s.department = :department";
+            $params[':department'] = $department_filter;
+        }
+        
         $query .= " ORDER BY a.tanggal_absen DESC, a.jam_datang DESC";
         
         $stmt = $pdo->prepare($query);
         $stmt->execute($params);
         $attendance_data = $stmt->fetchAll();
+        
+        // Get departments for filter
+        $dept_query = "SELECT DISTINCT department FROM tbl_shifts WHERE is_active = 1 ORDER BY department";
+        $dept_stmt = $pdo->prepare($dept_query);
+        $dept_stmt->execute();
+        $departments = $dept_stmt->fetchAll();
+        
+        // Hitung statistik
+        $total_records = count($attendance_data);
+        $total_hadir_lengkap = count(array_filter($attendance_data, function($row) {
+            return $row['status_absen'] === 'lengkap';
+        }));
+        $total_lembur = count(array_filter($attendance_data, function($row) {
+            return $row['status_lembur'] === 'lembur_selesai';
+        }));
+        $total_terlambat = 0;
+        
+        // Hitung keterlambatan berdasarkan shift
+        foreach ($attendance_data as $row) {
+            if ($row['jam_datang'] && $row['start_time']) {
+                $jamDatang = strtotime($row['jam_datang']);
+                $jamMulaiShift = strtotime($row['start_time']);
+                $toleransi = ($row['tolerance_minutes'] ?? 15) * 60;
+                if ($jamDatang > ($jamMulaiShift + $toleransi)) {
+                    $total_terlambat++;
+                }
+            }
+        }
         
     } catch (PDOException $e) {
         die("Error mengambil data: " . $e->getMessage());
@@ -240,6 +277,52 @@
     }
 }
 
+/* Status badges khusus untuk keterlambatan */
+.status-tepat-waktu {
+    background: #d1fae5;
+    color: #065f46;
+}
+
+.status-toleransi {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-terlambat {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* Summary cards */
+.summary-cards {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+    gap: 1rem;
+    margin: 1rem 0;
+}
+
+.summary-card {
+    background: white;
+    padding: 1.5rem;
+    border-radius: 12px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    text-align: center;
+    border-left: 4px solid #667eea;
+}
+
+.summary-card .number {
+    font-size: 2rem;
+    font-weight: bold;
+    color: #667eea;
+    margin-bottom: 0.5rem;
+}
+
+.summary-card .label {
+    color: #6b7280;
+    font-size: 0.875rem;
+    font-weight: 600;
+}
+
 @media (max-width: 768px) {
     .filters {
         grid-template-columns: 1fr;
@@ -252,11 +335,38 @@
     .btn {
         justify-content: center;
     }
+    
+    .data-table {
+        font-size: 0.75rem;
+    }
+    
+    .data-table th,
+    .data-table td {
+        padding: 0.5rem 0.25rem;
+    }
 }
 </style>
 <div class="report-container">
     <div class="report-header">
         <h1 class="report-title">📊 Laporan Absensi</h1>
+        <div style="margin-top: 1rem; display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 1rem;">
+            <div style="background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold;"><?php echo $total_records; ?></div>
+                <div style="font-size: 0.875rem; opacity: 0.9;">Total Records</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold;"><?php echo $total_hadir_lengkap; ?></div>
+                <div style="font-size: 0.875rem; opacity: 0.9;">Hadir Lengkap</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold;"><?php echo $total_lembur; ?></div>
+                <div style="font-size: 0.875rem; opacity: 0.9;">Total Lembur</div>
+            </div>
+            <div style="background: rgba(255,255,255,0.2); padding: 1rem; border-radius: 8px; text-align: center;">
+                <div style="font-size: 2rem; font-weight: bold;"><?php echo $total_terlambat; ?></div>
+                <div style="font-size: 0.875rem; opacity: 0.9;">Terlambat</div>
+            </div>
+        </div>
     </div>
     
     <div class="filters-section no-print">
@@ -279,6 +389,18 @@
                            placeholder="Masukkan nama user">
                 </div>
                 <div class="filter-group">
+                    <label for="department">🏢 Departemen</label>
+                    <select id="department" name="department" style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.875rem;">
+                        <option value="">Semua Departemen</option>
+                        <?php foreach ($departments as $dept): ?>
+                            <option value="<?php echo htmlspecialchars($dept['department']); ?>" 
+                                    <?php echo $department_filter === $dept['department'] ? 'selected' : ''; ?>>
+                                <?php echo htmlspecialchars($dept['department']); ?>
+                            </option>
+                        <?php endforeach; ?>
+                    </select>
+                </div>
+                <div class="filter-group">
                     <label for="status_lembur">⏰ Status Lembur</label>
                     <select id="status_lembur" name="status_lembur" style="padding: 0.75rem; border: 1px solid #d1d5db; border-radius: 8px; font-size: 0.875rem;">
                         <option value="">Semua Status</option>
@@ -295,6 +417,9 @@
                 </button>
                 <button type="button" onclick="window.print()" class="btn btn-secondary">
                     🖨️ Cetak Laporan
+                </button>
+                <button type="button" onclick="exportToExcel()" class="btn btn-secondary">
+                    📊 Export Excel
                 </button>
             </div>
         </form>
@@ -324,9 +449,12 @@
                         <th>NIP</th>
                         <th>Nama User</th>
                         <th>Jabatan</th>
+                        <th>Departemen</th>
+                        <th>Shift</th>
                         <th>Tanggal</th>
                         <th>Jam Datang</th>
                         <th>Jam Pulang</th>
+                        <th>Status Keterlambatan</th>
                         <th>Lembur Mulai</th>
                         <th>Lembur Selesai</th>
                         <th>Status Lembur</th>
@@ -336,14 +464,47 @@
                 </thead>
                 <tbody>
                     <?php foreach ($attendance_data as $index => $row): ?>
+                        <?php
+                        // Hitung status keterlambatan
+                        $statusTerlambat = '-';
+                        $terlambatClass = 'status-default';
+                        if ($row['jam_datang'] && $row['start_time']) {
+                            $jamDatang = strtotime($row['jam_datang']);
+                            $jamMulaiShift = strtotime($row['start_time']);
+                            $toleransi = ($row['tolerance_minutes'] ?? 15) * 60; // dalam detik
+                            
+                            if ($jamDatang <= $jamMulaiShift) {
+                                $statusTerlambat = '✅ Tepat Waktu';
+                                $terlambatClass = 'status-hadir';
+                            } elseif ($jamDatang <= ($jamMulaiShift + $toleransi)) {
+                                $menitTerlambat = ceil(($jamDatang - $jamMulaiShift) / 60);
+                                $statusTerlambat = "⚠️ Terlambat {$menitTerlambat}m (Toleransi)";
+                                $terlambatClass = 'status-datang';
+                            } else {
+                                $menitTerlambat = ceil(($jamDatang - $jamMulaiShift) / 60);
+                                $statusTerlambat = "❌ Terlambat {$menitTerlambat}m";
+                                $terlambatClass = 'status-default';
+                            }
+                        }
+                        ?>
                         <tr>
                             <td><?php echo $index + 1; ?></td>
                             <td><?php echo htmlspecialchars($row['NIP']); ?></td>
                             <td><?php echo htmlspecialchars($row['name']); ?></td>
                             <td><?php echo htmlspecialchars($row['jabatan']); ?></td>
+                            <td><?php echo htmlspecialchars($row['department'] ?? '-'); ?></td>
+                            <td>
+                                <?php if ($row['shift_name']): ?>
+                                    <strong><?php echo htmlspecialchars($row['shift_name']); ?></strong><br>
+                                    <small><?php echo $row['start_time'] . ' - ' . $row['end_time']; ?></small>
+                                <?php else: ?>
+                                    <span style="color: #ef4444;">Belum Ada Shift</span>
+                                <?php endif; ?>
+                            </td>
                             <td><?php echo $row['tanggal_absen'] ? date('d/m/Y', strtotime($row['tanggal_absen'])) : '-'; ?></td>
                             <td><?php echo $row['jam_datang'] ? date('H:i:s', strtotime($row['jam_datang'])) : '-'; ?></td>
                             <td><?php echo $row['jam_pulang'] ? date('H:i:s', strtotime($row['jam_pulang'])) : '-'; ?></td>
+                            <td><span class="status-badge <?php echo $terlambatClass; ?>"><?php echo $statusTerlambat; ?></span></td>
                             <td><?php echo $row['jam_lembur_mulai'] ? date('H:i:s', strtotime($row['jam_lembur_mulai'])) : '-'; ?></td>
                             <td><?php echo $row['jam_lembur_selesai'] ? date('H:i:s', strtotime($row['jam_lembur_selesai'])) : '-'; ?></td>
                             <td>
@@ -407,3 +568,49 @@
         <?php endif; ?>
     </div>
 </div>
+
+<script>
+function exportToExcel() {
+    // Get current URL parameters for filter
+    const urlParams = new URLSearchParams(window.location.search);
+    const params = {
+        start_date: urlParams.get('start_date') || '<?php echo $start_date; ?>',
+        end_date: urlParams.get('end_date') || '<?php echo $end_date; ?>',
+        search_name: urlParams.get('search_name') || '',
+        department: urlParams.get('department') || '',
+        status_lembur: urlParams.get('status_lembur') || '',
+        export: 'excel'
+    };
+    
+    // Build URL
+    const queryString = Object.keys(params)
+        .filter(key => params[key] !== '')
+        .map(key => `${key}=${encodeURIComponent(params[key])}`)
+        .join('&');
+    
+    // Create download link
+    window.location.href = `export_laporan.php?${queryString}`;
+}
+
+// Auto-refresh setiap 30 detik jika tidak ada filter aktif
+<?php if (empty($search_name) && empty($status_lembur_filter) && empty($department_filter)): ?>
+setTimeout(() => window.location.reload(), 30000);
+<?php endif; ?>
+
+// Highlight row on hover untuk table besar
+document.addEventListener('DOMContentLoaded', function() {
+    const tableRows = document.querySelectorAll('.data-table tbody tr');
+    tableRows.forEach(row => {
+        row.addEventListener('mouseenter', function() {
+            this.style.backgroundColor = '#f0f9ff';
+            this.style.transform = 'scale(1.01)';
+            this.style.transition = 'all 0.2s ease';
+        });
+        
+        row.addEventListener('mouseleave', function() {
+            this.style.backgroundColor = '';
+            this.style.transform = '';
+        });
+    });
+});
+</script>

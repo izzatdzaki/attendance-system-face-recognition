@@ -214,7 +214,7 @@ th, td {
         <span id="popupMessage">Berhasil Mendaftarkan User</span>
     </div>
 
-    <div id="registrationDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1000;">
+    <div id="registrationDialog" style="display: none; position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%); background: white; padding: 20px; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 1000; max-width: 400px; width: 90%;">
     <div class="dialog-content">
         <h3>Daftarkan User</h3>
         <label for="userName">Nama:</label>
@@ -223,6 +223,16 @@ th, td {
         <input type="text" id="userNIP" placeholder="Masukkan NIP" required>
         <label for="userJabatan">Jabatan:</label>
         <input type="text" id="userJabatan" placeholder="Masukkan jabatan" required>
+        <label for="userDepartment">Departemen:</label>
+        <select id="userDepartment" style="padding: 10px; margin-top: 5px; border: 1px solid #ccc; border-radius: 4px; width: 100%;" onchange="updateShiftInfo()">
+            <option value="">-- Pilih Departemen (Opsional) --</option>
+        </select>
+        
+        <div id="shiftInfo" style="margin-top: 10px; padding: 10px; background: #f0f8ff; border-radius: 4px; display: none;">
+            <small id="shiftDetails" style="color: #2c5aa0; font-weight: 500;"></small>
+        </div>
+        
+        <input type="hidden" id="userShift" value="">
         <div style="display: flex; gap: 10px; margin-top: 15px;">
             <button id="submitRegistration" class="bg-indigo-600 text-white py-2 px-4 rounded-md hover:bg-indigo-700">Daftarkan</button>
             <button id="cancelRegistration" class="bg-gray-200 text-gray-800 py-2 px-4 rounded-md hover:bg-gray-300">Batal</button>
@@ -312,11 +322,152 @@ th, td {
             registerBtn.disabled = false;
             attendanceBtn.disabled = false;
             
+            // Load shifts for dropdown
+            loadShifts();
+            
             startVideo();
         } catch (error) {
             statusDiv.className = "status error";
             statusDiv.textContent = `Gagal memuat model: ${error.message}`;
             console.error(error);
+        }
+    }
+
+    // Store all shifts data globally
+    let allShifts = [];
+    let shiftsByDept = {};
+
+    // Fungsi untuk memuat data shift
+    async function loadShifts() {
+        try {
+            const response = await fetch('../api_shifts.php?action=get_shifts');
+            const result = await response.json();
+            
+            if (result.success) {
+                allShifts = result.data.filter(shift => shift.is_active);
+                
+                // Group shifts by department
+                shiftsByDept = {};
+                allShifts.forEach(shift => {
+                    if (!shiftsByDept[shift.department]) {
+                        shiftsByDept[shift.department] = [];
+                    }
+                    shiftsByDept[shift.department].push(shift);
+                });
+                
+                // Populate department dropdown
+                const deptSelect = document.getElementById('userDepartment');
+                deptSelect.innerHTML = '<option value="">-- Pilih Departemen (Opsional) --</option>';
+                
+                Object.keys(shiftsByDept).sort().forEach(dept => {
+                    const option = document.createElement('option');
+                    option.value = dept;
+                    option.textContent = dept;
+                    deptSelect.appendChild(option);
+                });
+            }
+        } catch (error) {
+            console.error('Error loading shifts:', error);
+        }
+    }
+
+    // Fungsi untuk update info shift berdasarkan departemen dan waktu
+    function updateShiftInfo() {
+        const department = document.getElementById('userDepartment').value;
+        const shiftInfo = document.getElementById('shiftInfo');
+        const shiftDetails = document.getElementById('shiftDetails');
+        const hiddenShiftId = document.getElementById('userShift');
+        
+        if (!department) {
+            shiftInfo.style.display = 'none';
+            hiddenShiftId.value = '';
+            return;
+        }
+        
+        const departmentShifts = shiftsByDept[department] || [];
+        if (departmentShifts.length === 0) {
+            shiftInfo.style.display = 'none';
+            hiddenShiftId.value = '';
+            return;
+        }
+        
+        // Get current time
+        const now = new Date();
+        const currentTime = now.getHours() * 60 + now.getMinutes(); // Convert to minutes
+        
+        // Find the appropriate shift based on current time
+        let selectedShift = null;
+        let bestMatch = null;
+        
+        for (const shift of departmentShifts) {
+            const startMinutes = timeToMinutes(shift.start_time);
+            const endMinutes = timeToMinutes(shift.end_time);
+            
+            if (shift.is_overnight == 1) {
+                // Handle overnight shift (e.g., 21:00 - 07:00)
+                if (currentTime >= startMinutes || currentTime <= endMinutes) {
+                    selectedShift = shift;
+                    break;
+                }
+            } else {
+                // Handle regular shift
+                if (currentTime >= startMinutes && currentTime <= endMinutes) {
+                    selectedShift = shift;
+                    break;
+                }
+                
+                // Find closest upcoming shift as fallback
+                if (currentTime < startMinutes) {
+                    if (!bestMatch || startMinutes < timeToMinutes(bestMatch.start_time)) {
+                        bestMatch = shift;
+                    }
+                }
+            }
+        }
+        
+        // If no current shift found, use the best match or first shift
+        if (!selectedShift) {
+            selectedShift = bestMatch || departmentShifts[0];
+        }
+        
+        // Update UI
+        if (selectedShift) {
+            hiddenShiftId.value = selectedShift.id;
+            
+            const isCurrentTime = isInShiftTime(selectedShift, currentTime);
+            const statusText = isCurrentTime ? 
+                `🟢 Sedang dalam jam kerja` : 
+                `🔵 Shift yang akan dipilih`;
+            
+            shiftDetails.innerHTML = `
+                <strong>${selectedShift.shift_name}</strong><br>
+                <span style="color: #666;">Jam kerja: ${formatTime(selectedShift.start_time)} - ${formatTime(selectedShift.end_time)}</span><br>
+                <span style="color: ${isCurrentTime ? '#22c55e' : '#3b82f6'};">${statusText}</span>
+                ${selectedShift.is_overnight == 1 ? '<br><span style="color: #f59e0b;">⭐ Shift malam (overnight)</span>' : ''}
+            `;
+            
+            shiftInfo.style.display = 'block';
+        }
+    }
+
+    // Helper functions
+    function timeToMinutes(timeString) {
+        const [hours, minutes] = timeString.split(':').map(Number);
+        return hours * 60 + minutes;
+    }
+    
+    function formatTime(timeString) {
+        return timeString.substring(0, 5);
+    }
+    
+    function isInShiftTime(shift, currentMinutes) {
+        const startMinutes = timeToMinutes(shift.start_time);
+        const endMinutes = timeToMinutes(shift.end_time);
+        
+        if (shift.is_overnight == 1) {
+            return currentMinutes >= startMinutes || currentMinutes <= endMinutes;
+        } else {
+            return currentMinutes >= startMinutes && currentMinutes <= endMinutes;
         }
     }
 
@@ -440,6 +591,8 @@ document.getElementById('submitRegistration').addEventListener('click', async ()
     const name = document.getElementById('userName').value;
     const NIP = document.getElementById('userNIP').value;
     const jabatan = document.getElementById('userJabatan').value;
+    const department = document.getElementById('userDepartment').value;
+    const shiftId = document.getElementById('userShift').value; // Hidden field with auto-selected shift
 
     if (!name || !jabatan || !NIP) {
         alert("Nama, NIP dan jabatan harus diisi!");
@@ -462,18 +615,31 @@ document.getElementById('submitRegistration').addEventListener('click', async ()
             name: name,
             NIP : NIP,
             jabatan: jabatan,
+            shift_id: shiftId || null,
             face_descriptor: JSON.stringify(descriptorArray)
         });
         
         if (response.success) {
-            statusDiv.textContent = `${name} berhasil didaftarkan!`;
+            let successMessage = `${name} berhasil didaftarkan`;
+            if (department && shiftId) {
+                // Get shift details for success message
+                const selectedShift = allShifts.find(s => s.id == shiftId);
+                if (selectedShift) {
+                    successMessage += ` dengan shift ${selectedShift.department} - ${selectedShift.shift_name}`;
+                }
+            }
+            
+            statusDiv.textContent = successMessage + '!';
             statusDiv.className = "status success";
-            showPopup(`${name} berhasil didaftarkan`);
+            showPopup(successMessage);
             
             // Reset dialog
             document.getElementById('userName').value = '';
             document.getElementById('userNIP').value = '';
             document.getElementById('userJabatan').value = '';
+            document.getElementById('userDepartment').value = '';
+            document.getElementById('userShift').value = '';
+            document.getElementById('shiftInfo').style.display = 'none';
             document.getElementById('registrationDialog').style.display = 'none';
             currentFaceDescriptor = null;
         } else {
@@ -487,6 +653,12 @@ document.getElementById('submitRegistration').addEventListener('click', async ()
 
 // Handle cancel button
 document.getElementById('cancelRegistration').addEventListener('click', () => {
+    document.getElementById('userName').value = '';
+    document.getElementById('userNIP').value = '';
+    document.getElementById('userJabatan').value = '';
+    document.getElementById('userDepartment').value = '';
+    document.getElementById('userShift').value = '';
+    document.getElementById('shiftInfo').style.display = 'none';
     document.getElementById('registrationDialog').style.display = 'none';
     currentFaceDescriptor = null;
     statusDiv.textContent = "Sistem siap digunakan";

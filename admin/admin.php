@@ -147,6 +147,12 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                         </svg>
                         <span>Tambahkan Pengguna</span>
                     </a>
+                    <a href="?page=shifts" class="flex items-center px-4 py-3 rounded-lg <?= $current_page == 'shifts' ? 'bg-indigo-900' : 'hover:bg-indigo-700' ?>">
+                        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                        </svg>
+                        <span>Master Shift</span>
+                    </a>
                     <a href="?page=locations" class="flex items-center px-4 py-3 rounded-lg <?= $current_page == 'locations' ? 'bg-indigo-900' : 'hover:bg-indigo-700' ?>">
                         <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5 mr-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/>
@@ -170,6 +176,7 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                             case 'laporan': echo 'Laporan'; break;
                             case 'users': echo 'Data User'; break;
                             case 'add': echo 'Tambahkan User'; break;
+                            case 'shifts': echo 'Master Shift'; break;
                             case 'locations': echo 'Pengaturan Lokasi'; break;
                             default: echo 'Dashboard';
                         }
@@ -204,6 +211,9 @@ $current_page = isset($_GET['page']) ? $_GET['page'] : 'dashboard';
                         break;
                     case 'add':
                         include 'views/add.php';
+                        break;
+                    case 'shifts':
+                        include 'views/shifts.php';
                         break;
                     case 'locations':
                         include 'views/locations.php';

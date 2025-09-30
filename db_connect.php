@@ -1,6 +1,6 @@
 <?php
 // Set timezone Indonesia
-date_default_timezone_set('Asia/Jakarta');
+date_default_timezone_set('Asia/Makassar');
 
 function connectDB() {
     $host = 'localhost';    // Alamat server database
@@ -17,7 +17,7 @@ function connectDB() {
         $pdo->setAttribute(PDO::ATTR_EMULATE_PREPARES, false);
         
         // Set timezone untuk MySQL
-        $pdo->exec("SET time_zone = '+07:00'");
+        $pdo->exec("SET time_zone = '+08:00'");
         
         // Tes koneksi
         $pdo->query("SELECT 1");
